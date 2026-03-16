@@ -93,9 +93,10 @@ local DEFAULT_GRAVITY = 196.2
 local GALAXY_HOP_COOLDOWN = 0.08
 local rightWaypoints = {
 	Vector3.new(-469.29, -6.53, 112.47),
-	Vector3.new(-471.35, -7.00, 72.00),
-	Vector3.new(-471.35, -7.00, 37.00),
-	Vector3.new(-486.20, -4.58, 24.14),
+	Vector3.new(-471.35, -7.00, 60.00),
+	Vector3.new(-471.35, -7.00, 30.00),
+	Vector3.new(-478.00, -6.00, 24.21),
+	Vector3.new(-487.23, -4.53, 24.21),
 }
 local leftWaypoints = {
 	Vector3.new(-472.49, -7.00, 90.62),
