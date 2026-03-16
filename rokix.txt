@@ -593,7 +593,7 @@ local function faceNorth()
 end
 
 local function getAutoSpeed(idx)
-	return (idx >= 3) and 29.4 or NORMAL_SPEED
+	return NORMAL_SPEED
 end
 
 local function startAutoLeft()
@@ -1864,11 +1864,11 @@ local function isRagdolled(c)
 	local h = c:FindFirstChildOfClass("Humanoid")
 	if h then
 		local st = h:GetState()
-		if st == Enum.HumanoidStateType.Ragdoll or st == Enum.HumanoidStateType.FallingDown or st == Enum.HumanoidStateType.Physics then
+		if st == Enum.HumanoidStateType.Ragdoll or st == Enum.HumanoidStateType.FallingDown or st == Enum.HumanoidStateType.Physics or st == Enum.HumanoidStateType.GettingUp then
 			return true
 		end
 	end
-	local rv = c:FindFirstChild("Ragdoll") or c:FindFirstChild("IsRagdoll")
+	local rv = c:FindFirstChild("Ragdoll") or c:FindFirstChild("IsRagdoll") or c:FindFirstChild("Stunned")
 	if rv and rv:IsA("BoolValue") and rv.Value then return true end
 	return false
 end
