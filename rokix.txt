@@ -92,9 +92,9 @@ local toggleButtons, sliderValues, keybindButtons = {}, {}, {}
 local DEFAULT_GRAVITY = 196.2
 local GALAXY_HOP_COOLDOWN = 0.08
 local rightWaypoints = {
-	Vector3.new(-473.04, -7.00, 29.71),
-	Vector3.new(-472.41, -7.00, 37.02),
-	Vector3.new(-471.35, -7.00, 24.67),
+	Vector3.new(-469.29, -6.53, 112.47),
+	Vector3.new(-471.35, -7.00, 72.00),
+	Vector3.new(-471.35, -7.00, 37.00),
 	Vector3.new(-486.20, -4.58, 24.14),
 }
 local leftWaypoints = {
@@ -1874,25 +1874,36 @@ end
 
 RunService.Heartbeat:Connect(function()
 	if not char or not hum or not hrp then return end
+
+	-- Mémoriser le côté EN PERMANENCE même quand stopped
 	if autoLeftEnabled then lastAutoSide = "left"
 	elseif autoRightEnabled then lastAutoSide = "right" end
 
-	if lastAutoSide == "none" then wasRagdolled = false return end
+	-- Seulement actif si un côté est en cours
+	if lastAutoSide == "none" then return end
 
 	local ragdolled = isRagdolled(char)
 
 	if ragdolled and not wasRagdolled then
 		wasRagdolled = true
 		local sideSave = lastAutoSide
+		-- Stop proprement
 		if autoLeftEnabled then stopAutoLeft() end
 		if autoRightEnabled then stopAutoRight() end
-		-- Repart immédiatement
+		-- Repart immédiatement depuis le début
 		task.spawn(function()
 			task.wait(0.05)
+			autoCurrentWaypoint = 1
 			if sideSave == "left" then
-				setAutoLeft(true)
+				autoLeftEnabled = true
+				startAutoLeft()
+				updateToggleUI("Auto Left", true)
+				if floatButtons["AutoLeft"] then floatButtons["AutoLeft"].state = true floatButtons["AutoLeft"].indicator.BackgroundColor3 = THEME.Accent end
 			else
-				setAutoRight(true)
+				autoRightEnabled = true
+				startAutoRight()
+				updateToggleUI("Auto Right", true)
+				if floatButtons["AutoRight"] then floatButtons["AutoRight"].state = true floatButtons["AutoRight"].indicator.BackgroundColor3 = THEME.Accent end
 			end
 		end)
 	elseif not ragdolled then
