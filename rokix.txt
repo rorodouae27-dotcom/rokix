@@ -75,7 +75,7 @@ local StealData, espConnections, espObjects = {}, {}, {}
 local originalTransparency, originalSettings = {}, {}
 local autoLeftConn, autoRightConn, autoStealConn, antiRagdollConn = nil, nil, nil, nil
 local progressConnection = nil
-local autoLeftPhase, autoRightPhase = 1, 1
+local autoCurrentWaypoint = 1
 local galaxyVectorForce, galaxyAttachment = nil, nil
 local spinBAV = nil
 local ProgressBarFill, ProgressBarContainer, ProgressPercentLabel, RadiusInput = nil, nil, nil, nil
@@ -91,10 +91,18 @@ local char, hum, hrp = nil, nil, nil
 local toggleButtons, sliderValues, keybindButtons = {}, {}, {}
 local DEFAULT_GRAVITY = 196.2
 local GALAXY_HOP_COOLDOWN = 0.08
-local POSITION_L1 = Vector3.new(-476.48, -6.28, 92.73)
-local POSITION_L2 = Vector3.new(-483.12, -4.95, 94.80)
-local POSITION_R1 = Vector3.new(-476.16, -6.52, 25.62)
-local POSITION_R2 = Vector3.new(-483.04, -5.09, 23.14)
+local rightWaypoints = {
+	Vector3.new(-473.04, -6.99, 29.71),
+	Vector3.new(-483.57, -5.10, 18.74),
+	Vector3.new(-475.00, -6.99, 26.43),
+	Vector3.new(-474.67, -6.94, 105.48),
+}
+local leftWaypoints = {
+	Vector3.new(-472.49, -7.00, 90.62),
+	Vector3.new(-484.62, -5.10, 100.37),
+	Vector3.new(-475.08, -7.00, 93.29),
+	Vector3.new(-474.22, -6.96, 16.18),
+}
 local CONFIG_NAME, lastSaveTime, savedAnimate = "VoidHubConfig", 0, nil
 local floatButtons = {}
 local FPSLabel, PingLabel = nil, nil
@@ -583,47 +591,41 @@ local function faceNorth()
 	end
 end
 
+local function getAutoSpeed(idx)
+	return (idx >= 3) and 29.4 or NORMAL_SPEED
+end
+
 local function startAutoLeft()
 	if autoLeftConn then autoLeftConn:Disconnect() end
-	autoLeftPhase = 1
+	autoCurrentWaypoint = 1
 
 	autoLeftConn = RunService.Heartbeat:Connect(function()
 		if not autoLeftEnabled or not char or not hrp or not hum then return end
-		local currentSpeed = NORMAL_SPEED
+		local waypoints = leftWaypoints
+		local targetPos = waypoints[autoCurrentWaypoint]
+		local targetXZ = Vector3.new(targetPos.X, 0, targetPos.Z)
+		local currentXZ = Vector3.new(hrp.Position.X, 0, hrp.Position.Z)
+		local dist = (targetXZ - currentXZ).Magnitude
+		local speed = getAutoSpeed(autoCurrentWaypoint)
 
-		if autoLeftPhase == 1 then
-			local targetPos = Vector3.new(POSITION_L1.X, hrp.Position.Y, POSITION_L1.Z)
-			local dist = (targetPos - hrp.Position).Magnitude
-			if dist < 1 then
-				autoLeftPhase = 2
-				local dir = (POSITION_L2 - hrp.Position)
-				local moveDir = Vector3.new(dir.X, 0, dir.Z).Unit
-				hum:Move(moveDir, false)
-				hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * currentSpeed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * currentSpeed)
-				return
-			end
-			local dir = (POSITION_L1 - hrp.Position)
-			local moveDir = Vector3.new(dir.X, 0, dir.Z).Unit
+		if dist > 3 then
+			local moveDir = (targetXZ - currentXZ).Unit
 			hum:Move(moveDir, false)
-			hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * currentSpeed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * currentSpeed)
-		elseif autoLeftPhase == 2 then
-			local targetPos = Vector3.new(POSITION_L2.X, hrp.Position.Y, POSITION_L2.Z)
-			local dist = (targetPos - hrp.Position).Magnitude
-			if dist < 1 then
+			hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * speed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * speed)
+		else
+			if autoCurrentWaypoint == #waypoints then
 				hum:Move(Vector3.zero, false)
-				hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
 				autoLeftEnabled = false
 				if autoLeftConn then autoLeftConn:Disconnect() autoLeftConn = nil end
-				autoLeftPhase = 1
+				autoCurrentWaypoint = 1
 				updateToggleUI("Auto Left", false)
 				if floatButtons["AutoLeft"] then floatButtons["AutoLeft"].state = false floatButtons["AutoLeft"].indicator.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end
-				faceSouth()
-				return
+				faceNorth()
+				task.spawn(function() task.wait(0.1) setAutoRight(true) end)
+			else
+				autoCurrentWaypoint = autoCurrentWaypoint + 1
 			end
-			local dir = (POSITION_L2 - hrp.Position)
-			local moveDir = Vector3.new(dir.X, 0, dir.Z).Unit
-			hum:Move(moveDir, false)
-			hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * currentSpeed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * currentSpeed)
 		end
 	end)
 end
@@ -631,7 +633,7 @@ end
 local function stopAutoLeft()
 	autoLeftEnabled = false
 	if autoLeftConn then autoLeftConn:Disconnect() autoLeftConn = nil end
-	autoLeftPhase = 1
+	autoCurrentWaypoint = 1
 	if char and hum then hum:Move(Vector3.zero, false) end
 	updateToggleUI("Auto Left", false)
 	if floatButtons["AutoLeft"] then
@@ -642,45 +644,35 @@ end
 
 local function startAutoRight()
 	if autoRightConn then autoRightConn:Disconnect() end
-	autoRightPhase = 1
+	autoCurrentWaypoint = 1
 
 	autoRightConn = RunService.Heartbeat:Connect(function()
 		if not autoRightEnabled or not char or not hrp or not hum then return end
-		local currentSpeed = NORMAL_SPEED
+		local waypoints = rightWaypoints
+		local targetPos = waypoints[autoCurrentWaypoint]
+		local targetXZ = Vector3.new(targetPos.X, 0, targetPos.Z)
+		local currentXZ = Vector3.new(hrp.Position.X, 0, hrp.Position.Z)
+		local dist = (targetXZ - currentXZ).Magnitude
+		local speed = getAutoSpeed(autoCurrentWaypoint)
 
-		if autoRightPhase == 1 then
-			local targetPos = Vector3.new(POSITION_R1.X, hrp.Position.Y, POSITION_R1.Z)
-			local dist = (targetPos - hrp.Position).Magnitude
-			if dist < 1 then
-				autoRightPhase = 2
-				local dir = (POSITION_R2 - hrp.Position)
-				local moveDir = Vector3.new(dir.X, 0, dir.Z).Unit
-				hum:Move(moveDir, false)
-				hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * currentSpeed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * currentSpeed)
-				return
-			end
-			local dir = (POSITION_R1 - hrp.Position)
-			local moveDir = Vector3.new(dir.X, 0, dir.Z).Unit
+		if dist > 3 then
+			local moveDir = (targetXZ - currentXZ).Unit
 			hum:Move(moveDir, false)
-			hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * currentSpeed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * currentSpeed)
-		elseif autoRightPhase == 2 then
-			local targetPos = Vector3.new(POSITION_R2.X, hrp.Position.Y, POSITION_R2.Z)
-			local dist = (targetPos - hrp.Position).Magnitude
-			if dist < 1 then
+			hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * speed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * speed)
+		else
+			if autoCurrentWaypoint == #waypoints then
 				hum:Move(Vector3.zero, false)
-				hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
 				autoRightEnabled = false
 				if autoRightConn then autoRightConn:Disconnect() autoRightConn = nil end
-				autoRightPhase = 1
+				autoCurrentWaypoint = 1
 				updateToggleUI("Auto Right", false)
 				if floatButtons["AutoRight"] then floatButtons["AutoRight"].state = false floatButtons["AutoRight"].indicator.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end
-				faceNorth()
-				return
+				faceSouth()
+				task.spawn(function() task.wait(0.1) setAutoLeft(true) end)
+			else
+				autoCurrentWaypoint = autoCurrentWaypoint + 1
 			end
-			local dir = (POSITION_R2 - hrp.Position)
-			local moveDir = Vector3.new(dir.X, 0, dir.Z).Unit
-			hum:Move(moveDir, false)
-			hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * currentSpeed, hrp.AssemblyLinearVelocity.Y, moveDir.Z * currentSpeed)
 		end
 	end)
 end
@@ -688,7 +680,7 @@ end
 local function stopAutoRight()
 	autoRightEnabled = false
 	if autoRightConn then autoRightConn:Disconnect() autoRightConn = nil end
-	autoRightPhase = 1
+	autoCurrentWaypoint = 1
 	if char and hum then hum:Move(Vector3.zero, false) end
 	updateToggleUI("Auto Right", false)
 	if floatButtons["AutoRight"] then
@@ -715,7 +707,7 @@ local function setAutoLeft(state)
 		if autoRightEnabled then
 			autoRightEnabled = false
 			if autoRightConn then autoRightConn:Disconnect() autoRightConn = nil end
-			autoRightPhase = 1
+			autoCurrentWaypoint = 1
 			if char and hum then hum:Move(Vector3.zero, false) end
 		end
 	end
@@ -749,7 +741,7 @@ local function setAutoRight(state)
 		if autoLeftEnabled then
 			autoLeftEnabled = false
 			if autoLeftConn then autoLeftConn:Disconnect() autoLeftConn = nil end
-			autoLeftPhase = 1
+			autoCurrentWaypoint = 1
 			if char and hum then hum:Move(Vector3.zero, false) end
 		end
 	end
@@ -772,7 +764,7 @@ local function setBatAimbot(state)
 		if autoLeftEnabled then
 			autoLeftEnabled = false
 			if autoLeftConn then autoLeftConn:Disconnect() autoLeftConn = nil end
-			autoLeftPhase = 1
+			autoCurrentWaypoint = 1
 			if char and hum then hum:Move(Vector3.zero, false) end
 			updateToggleUI("Auto Left", false)
 			if floatButtons["AutoLeft"] then
@@ -783,7 +775,7 @@ local function setBatAimbot(state)
 		if autoRightEnabled then
 			autoRightEnabled = false
 			if autoRightConn then autoRightConn:Disconnect() autoRightConn = nil end
-			autoRightPhase = 1
+			autoCurrentWaypoint = 1
 			if char and hum then hum:Move(Vector3.zero, false) end
 			updateToggleUI("Auto Right", false)
 			if floatButtons["AutoRight"] then
@@ -1068,7 +1060,7 @@ local function setupChar(c)
 	char = c
 	hum = char:WaitForChild("Humanoid", 5)
 	hrp = char:WaitForChild("HumanoidRootPart", 5)
-	autoLeftPhase = 1 autoRightPhase = 1
+	autoCurrentWaypoint = 1 autoCurrentWaypoint = 1
 	task.wait(0.5)
 	if not hum or not hrp then return end
 	local head = char:FindFirstChild("Head")
