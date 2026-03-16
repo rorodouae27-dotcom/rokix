@@ -1060,7 +1060,7 @@ local function setupChar(c)
 	char = c
 	hum = char:WaitForChild("Humanoid", 5)
 	hrp = char:WaitForChild("HumanoidRootPart", 5)
-	autoCurrentWaypoint = 1 autoCurrentWaypoint = 1
+	autoCurrentWaypoint = 1
 	task.wait(0.5)
 	if not hum or not hrp then return end
 	local head = char:FindFirstChild("Head")
@@ -1850,4 +1850,52 @@ if LocalPlayer.Character then setupChar(LocalPlayer.Character) end
 LocalPlayer.CharacterAdded:Connect(function(c)
 	task.wait(0.5)
 	setupChar(c)
+end)
+
+-- ============================================================
+--  RAGDOLL DETECTION : relance auto left/right après brainrot
+-- ============================================================
+local wasRagdolled = false
+local lastAutoSide = "none"
+
+local function isRagdolled(c)
+	if not c then return false end
+	local h = c:FindFirstChildOfClass("Humanoid")
+	if h then
+		local st = h:GetState()
+		if st == Enum.HumanoidStateType.Ragdoll or st == Enum.HumanoidStateType.FallingDown or st == Enum.HumanoidStateType.Physics then
+			return true
+		end
+	end
+	local rv = c:FindFirstChild("Ragdoll") or c:FindFirstChild("IsRagdoll")
+	if rv and rv:IsA("BoolValue") and rv.Value then return true end
+	return false
+end
+
+RunService.Heartbeat:Connect(function()
+	if not char or not hum or not hrp then return end
+	if autoLeftEnabled then lastAutoSide = "left"
+	elseif autoRightEnabled then lastAutoSide = "right" end
+
+	if lastAutoSide == "none" then wasRagdolled = false return end
+
+	local ragdolled = isRagdolled(char)
+
+	if ragdolled and not wasRagdolled then
+		wasRagdolled = true
+		local sideSave = lastAutoSide
+		if autoLeftEnabled then stopAutoLeft() end
+		if autoRightEnabled then stopAutoRight() end
+		-- Repart immédiatement
+		task.spawn(function()
+			task.wait(0.05)
+			if sideSave == "left" then
+				setAutoLeft(true)
+			else
+				setAutoRight(true)
+			end
+		end)
+	elseif not ragdolled then
+		wasRagdolled = false
+	end
 end)
